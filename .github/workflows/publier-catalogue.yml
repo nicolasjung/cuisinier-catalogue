@@ -22,6 +22,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Diagnostic réseau Synology (sans divulguer les adresses)
+        run: |
+          python - <<'PY'
+          import socket
+          host = "lesmenusduchat.synology.me"
+          try:
+              addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+              ipv4 = list({r[4][0] for r in addresses if r[0] == socket.AF_INET})
+              ipv6 = list({r[4][0] for r in addresses if r[0] == socket.AF_INET6})
+              print(f"DNS : {len(ipv4)} adresse(s) IPv4, {len(ipv6)} adresse(s) IPv6")
+              if not ipv4:
+                  print("DIAGNOSTIC : aucun enregistrement IPv4 utilisable sur le runner GitHub.")
+              for addr in ipv4:
+                  try:
+                      sock = socket.create_connection((addr, 443), timeout=5)
+                      sock.close()
+                      print("IPv4/TCP 443 : connexion réussie")
+                      break
+                  except OSError as exc:
+                      print(f"IPv4/TCP 443 : échec ({type(exc).__name__}, errno={exc.errno})")
+          except OSError as exc:
+              print(f"Échec DNS: {type(exc).__name__}, errno={exc.errno}")
+          PY
       - name: Copier le catalogue public depuis Synology
         run: python scripts/mirror.py --output public
       - uses: actions/configure-pages@v5
